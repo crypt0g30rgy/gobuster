@@ -41,6 +41,7 @@ func getFlags() []cli.Flag {
 		&cli.StringFlag{Name: "exclude-length", Aliases: []string{"xl"}, Usage: "exclude the following content lengths (completely ignores the status). You can separate multiple lengths by comma and it also supports ranges like 203-206"},
 		&cli.BoolFlag{Name: "force", Value: false, Usage: "Continue even if the prechecks fail. Please only use this if you know what you are doing, it can lead to unexpected results."},
 		&cli.StringFlag{Name: "list", Aliases: []string{"l"}, Usage: "File containing target URLs"},
+		&cli.BoolFlag{Name: "autocalibrate", Aliases: []string{"ac"}, Value: false, Usage: "Automatically calibrate wildcard responses"},
 	}...)
 	return flags
 }
@@ -78,8 +79,17 @@ func run(c *cli.Context) error {
 		}
 	}
 
+	outputFilename := c.String("output")
+	if outputFilename != "" && !c.Bool("append") {
+		f, err := os.Create(outputFilename)
+		if err != nil {
+			return fmt.Errorf("failed to create output file: %w", err)
+		}
+		f.Close()
+	}
+
 	for _, u := range urls {
-		err := runForTarget(c, u)
+		err := runForTarget(c, u, len(urls) > 1)
 		if err != nil {
 			// for multiple targets, we might want to continue or stop.
 			// for now let's stop on the first error to be safe, or just log it?
@@ -94,7 +104,7 @@ func run(c *cli.Context) error {
 	return nil
 }
 
-func runForTarget(c *cli.Context, targetURL string) error {
+func runForTarget(c *cli.Context, targetURL string, isMultiTarget bool) error {
 	pluginOpts := gobusterdir.NewOptions()
 
 	// Parse common options but we need to handle the URL separately
@@ -168,10 +178,25 @@ func runForTarget(c *cli.Context, targetURL string) error {
 		return fmt.Errorf("invalid value for exclude-length: %w", err)
 	}
 	pluginOpts.ExcludeLengthParsed = ret4
+	pluginOpts.AutoCalibrate = c.Bool("autocalibrate")
 
 	globalOpts, err := internalcli.ParseGlobalOptions(c)
 	if err != nil {
 		return err
+	}
+
+	// if an output file is specified, we always want to append
+	// as we handle the initial truncation once at the start of the run function
+	if globalOpts.OutputFilename != "" {
+		globalOpts.Append = true
+	}
+
+	// if we have multiple targets, we want to show the full URL
+	// so it's easy to identify which target a result belongs to.
+	if isMultiTarget {
+		pluginOpts.Expanded = true
+	} else {
+		pluginOpts.Expanded = c.Bool("expanded")
 	}
 
 	log := libgobuster.NewLogger(globalOpts.Debug)

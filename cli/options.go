@@ -225,6 +225,7 @@ func GlobalOptions() []cli.Flag {
 		&cli.StringFlag{Name: "pattern", Aliases: []string{"p"}, Usage: "File containing replacement patterns"},
 		&cli.StringFlag{Name: "discover-pattern", Aliases: []string{"pd"}, Usage: "File containing replacement patterns applied to successful guesses"},
 		&cli.BoolFlag{Name: "no-color", Aliases: []string{"nc"}, Value: false, Usage: "Disable color output"},
+		&cli.BoolFlag{Name: "append", Aliases: []string{"ap"}, Value: false, Usage: "Append to the output file instead of overwriting"},
 		&cli.BoolFlag{Name: "debug", Value: false, Usage: "enable debug output"},
 	}
 }
@@ -297,6 +298,7 @@ func ParseGlobalOptions(c *cli.Context) (libgobuster.Options, error) {
 	}
 
 	opts.Debug = c.Bool("debug")
+	opts.Append = c.Bool("append")
 	return opts, nil
 }
 
